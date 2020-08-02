@@ -31,15 +31,16 @@ use std::io::prelude::*; // For writing to a file
 use std::io::BufReader; // For reading standard input line by line // Allows us to use command line arguments (e.g. cargo run transpose)
 
 /* For creating the 'soundscape' vector */
-use rand_distr::{Distribution, Normal, Poisson};
+use rand_distr::{Distribution, Poisson};
+// use rand_distr::Normal;
 const POISSON_MEAN: f32 = 0.001; // Average milliseconds between symbol bursts
-const BURST_MEAN: f32 = 30.; // Average length of a symbol burst
+                                 // static mut BURST_MEAN: f32 = 30.; // Average length of a symbol burst
 const BURST_SD: f32 = 0.001; // Standard deviation for length of a symbol burst
 
 /* For overall control and specs for the ambient noise */
 const SOUND_SIZE: usize = 9; // Each frame of sound will be square with this side length
 const NUM_FRAMES: isize = 30; // Number of sound frames that we want to generate
-const NUM_TRAIN_SETS: usize = 1; // Number of random training sets to generate
+const NUM_TRAIN_SETS: usize = 2000; // Number of random training sets to generate
 const PROB_TO_BLACK: f64 = 0.05; // Probability that a white pixel turns black
 const PROB_TO_WHITE: f64 = 0.50; // Probability that a black pixel turns white
 
@@ -47,6 +48,9 @@ const PROB_TO_WHITE: f64 = 0.50; // Probability that a black pixel turns white
 const PROB_NOISE: f64 = 0.0; // Probability that each pixel in the final sound frame will switch 0 <-> 1
 
 fn main() -> std::io::Result<()> {
+    let seed = [46; 32];
+    let mut rng = StdRng::from_seed(seed);
+
     // If the command line call had an argument (as in: cargo run xxx), grab xxx:
     let args: Vec<String> = env::args().collect();
     let mut transpose = true;
@@ -66,7 +70,11 @@ fn main() -> std::io::Result<()> {
     let file_name = "./src/symbols_9x9.txt";
     let symbols = load_symbols(file_name);
     for i in 0..NUM_TRAIN_SETS {
+        let num_frames: isize = rng.gen_range(30, 50);
+        // BURST_MEAN = num.clone() as f32;
+        // NUM_FRAMES = num.clone() as isize;
         create_input_file(
+            num_frames,
             transpose,
             &mut file,
             &mut file_actions,
@@ -138,6 +146,7 @@ fn load_symbols(file_name: &str) -> HashMap<String, Symbol> {
 }
 
 fn create_input_file(
+    num_frames: isize,
     transpose: bool,
     file: &mut File,
     file_actions: &mut File,
@@ -159,12 +168,12 @@ fn create_input_file(
     // Create the original sound frame, all pixels white (0):
     let mut sound = [[0; SOUND_SIZE]; SOUND_SIZE];
     // This vector of length NUM_FRAMES represents periods of quiet and noise:
-    let soundscape = create_soundscape(symbol_id, symbols);
+    let soundscape = create_soundscape(symbol_id, num_frames, symbols);
     // [(1, "eat"), ... 30 times]
     // We store the input data as an array in case the user wishes to transpose the data:
     let mut input_array: Vec<Vec<String>> = Vec::new();
 
-    for frame_idx in 0..NUM_FRAMES {
+    for frame_idx in 0..num_frames {
         for r in 0..SOUND_SIZE {
             // See https://codeinreview.com/86/modifying-the-contents-of-an-array-of-vectors-in-rust/
             // for an explanation of this next line, especially the &mut bit:
@@ -328,7 +337,11 @@ fn create_input_file(
     Ok(())
 }
 
-fn create_soundscape(sym_id: u8, symbols: &HashMap<String, Symbol>) -> Vec<(u8, String)> {
+fn create_soundscape(
+    sym_id: u8,
+    num_frames: isize,
+    symbols: &HashMap<String, Symbol>,
+) -> Vec<(u8, String)> {
     /* Tuples in this vector will look like (0, "") or (1, "eat") where 0 represents
     a quiet millisecond and 1 represents a symbol is being transmitted, and the string
     tells us which symbol it is. */
@@ -350,8 +363,8 @@ fn create_soundscape(sym_id: u8, symbols: &HashMap<String, Symbol>) -> Vec<(u8, 
 
     let mut _rng = rand::thread_rng();
 
-    for _ in 0..NUM_FRAMES {
-        assert_eq!(NUM_FRAMES, BURST_MEAN as isize);
+    for _ in 0..num_frames {
+        // assert_eq!(NUM_FRAMES, BURST_MEAN as isize);
         if quiet {
             // let pv: f32 = generate_poisson_value();
             // let pv_int = pv as u8;
@@ -376,7 +389,7 @@ fn create_soundscape(sym_id: u8, symbols: &HashMap<String, Symbol>) -> Vec<(u8, 
     // println!("{}, {},\n {:?}\n\n", sym_id, soundscape.len(), soundscape);
 
     // Slice, because the loop above might allow for soundscapes longer than NUM_FRAMES:
-    soundscape[..(NUM_FRAMES as usize)].to_vec()
+    soundscape[..(num_frames as usize)].to_vec()
 }
 
 fn generate_poisson_value() -> f32 {
@@ -384,10 +397,10 @@ fn generate_poisson_value() -> f32 {
     poi.sample(&mut rand::thread_rng())
 }
 
-fn generate_normal_value() -> f32 {
-    let normal = Normal::new(BURST_MEAN, BURST_SD).unwrap();
-    normal.sample(&mut rand::thread_rng())
-}
+// fn generate_normal_value() -> f32 {
+//     let normal = Normal::new(BURST_MEAN, BURST_SD).unwrap();
+//     normal.sample(&mut rand::thread_rng())
+// }
 
 fn get_taxicab(pt1: Vec<usize>, pt2: Vec<usize>) -> isize {
     /* Returns the taxicab distance between the two given points. */
