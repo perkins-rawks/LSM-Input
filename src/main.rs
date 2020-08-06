@@ -51,6 +51,7 @@ fn main() -> std::io::Result<()> {
     let seed = [46; 32];
     let mut rng = StdRng::from_seed(seed);
 
+
     // If the command line call had an argument (as in: cargo run xxx), grab xxx:
     let args: Vec<String> = env::args().collect();
     let mut transpose = true;
